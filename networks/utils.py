@@ -21,9 +21,10 @@ class TreeHoleClient(object):
             'uid' : config['User']['uid']
         }
         self.morning_sleep = int(config['Defaults']['morning_sleep'])
-        # self.auto_depth = int(config['Defaults']['auto_depth'])
+        self.num_days = int(config['Defaults']['num_days'])
         self.get_interval = int(config['Defaults']['get_interval'])
         self.pages = int(config['Defaults']['search_pages'])
+        self.page_interval = int(config['Defaults']['page_interval'])
         self.mode = config['Mode']['mode']
         self.init_date = str(datetime.now()).split()[0]
         self.init_time = datetime.now()
@@ -96,7 +97,7 @@ class TreeHoleClient(object):
                     time.sleep(5*60*60) # sleep to 8am 
                 working_df = pd.DataFrame()
                 for page in range(1, self.pages+1):
-                    time.sleep(10+random.randint(-5,5))
+                    time.sleep(self.page_interval+random.randint(-3,3))
                     page_df = self._get_hole_data_page(page)
                     page_df['last_retrive'] = str(datetime.now()).split('.')[0]
                     working_df = page_df.combine_first(working_df)
@@ -107,7 +108,7 @@ class TreeHoleClient(object):
 
         # day mode
         elif self.mode == 'day':
-            print("爬取过去24小时消息")
+            print(f"爬取过去{str(self.num_days)}天消息")
             page = 1
             working_df = pd.DataFrame()
             while True:                
@@ -118,10 +119,10 @@ class TreeHoleClient(object):
                     print(f"{str(datetime.now()).split('.')[0]} 爬取至page{page}")
                     self._update_csv_from_data(working_df, os.path.join(os.path.dirname(__file__),f"../data/{self.init_date}_holes_{self.mode}.csv"))
                     working_df = pd.DataFrame() 
-                if (self.init_time - datetime.fromtimestamp(page_df.sort_values('timestamp').iloc[0]['timestamp'])).days == 1:
+                if (self.init_time - datetime.fromtimestamp(page_df.sort_values('timestamp').iloc[0]['timestamp'])).days == self.num_days:
                     break
                 page += 1
-                time.sleep(10+random.randint(-5,5))
+                time.sleep(self.page_interval+random.randint(-3,3))
 
             print(f"{str(datetime.now()).split('.')[0]}爬取完成！")
 
