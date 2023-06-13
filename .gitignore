@@ -1,5 +1,6 @@
 config.ini
 networks/test.ipynb
+./data/
 .DS_Store
 __pycache__/
 .vscode

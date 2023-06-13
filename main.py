@@ -1,11 +1,14 @@
-from networks.utils import TreeHoleClient
 from datetime import datetime
+from networks.loop import Crawler
 
 if __name__ == '__main__':
-    client = TreeHoleClient(create_new_file=True)
-    print(f"TreeHoleClient starting at {str(datetime.now()).split('.')[0]} as {client.mode} mode")
-    if client.login():
-        client.get_tree_hole_data()
+    crawler = Crawler()
+    crawler.login()
+    if crawler.login_status == True:
+        if crawler.mode == 'monitor':
+            crawler.monitor_treehole()
+        elif crawler.mode == 'day':
+            crawler.craw_treehole()
     
 
 
