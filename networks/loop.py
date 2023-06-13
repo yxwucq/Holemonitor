@@ -14,23 +14,26 @@ from .utils import TreeHoleClient, print_time
 
 class Crawler(object):
     def __init__(self):
-        self.morning_sleep = config['Monitor']['morning_sleep'] == 'True'
-        self.num_days = int(config['Day']['num_days'])
-        self.get_interval = int(config['Monitor']['get_interval'])
-        self.pages = int(config['Monitor']['search_pages'])
-        self.page_interval = int(config['Defaults']['page_interval'])
-        self.mode = config['Mode']['mode']
-        self.monitor_key_words = config['Monitor']['monitor_key_words'] == 'True'
         self.init_date = str(datetime.now()).split()[0]
         self.init_time = datetime.now()
         self.login_status = False
+        self.mode = config['Mode']['mode']
+        self.num_days = int(config['Day']['num_days'])
+        self.pages = int(config['Monitor']['search_pages'])
+        self.page_interval = int(config['Defaults']['page_interval'])
+        self.get_interval = int(config['Monitor']['get_interval'])
+        self.morning_sleep = config['Monitor']['morning_sleep'] == 'True'
+        self.monitor_key_words = config['Monitor']['monitor_key_words'] == 'True'
+        self.with_comments = config['Defaults']['comments'] == 'True'
 
         if self.mode == 'monitor' and self.monitor_key_words: 
             self.monitor_key_word_init()
         
+        # initialize database and client
         self.client = TreeHoleClient()
         self.db = SQLDatabase(os.path.join(os.path.dirname(__file__),f"../data/{self.init_date}_holes_{self.mode}.db"))
         self.db.create_holes_table()
+        self.db.create_comments_table()
         # self.db.create_comments_table()
         print(f"TreeHoleClient starting at {str(datetime.now()).split('.')[0]} as {self.mode} mode")
     
@@ -47,10 +50,17 @@ class Crawler(object):
                 time.sleep(5*60*60) # sleep to 8am 
             working_df = pd.DataFrame()
             for page in range(1, self.pages+1):
-                time.sleep(self.page_interval+random.randint(-3,3))
+                time.sleep(self.page_interval+random.randint(-1,1))
                 page_df = self.client.get_tree_hole_data(page)
                 working_df = page_df.combine_first(working_df)
-            working_df['time'] = working_df.timestamp.apply(datetime.fromtimestamp).astype(str)
+            # working_df['time'] = working_df.timestamp.apply(datetime.fromtimestamp).astype(str)
+            if self.with_comments:
+                comments_df = pd.DataFrame()
+                for pid, row in working_df.iterrows():
+                    reply_num = int(row['reply'])
+                    if reply_num > 0:
+                        comments_df = self.client.get_comments_data(pid, reply_num).combine_first(comments_df)
+                self.db.update_comments_data(comments_df)
             if self.monitor_key_words:
                 print(f"监控关键词 {self.key_words}")
                 match_df = self.find_match_in_dataframe(working_df)
@@ -72,15 +82,23 @@ class Crawler(object):
             working_df = page_df.combine_first(working_df)
             if page % 10 == 0:
                 print(f"{str(datetime.now()).split('.')[0]} 爬取至page{page}")
-                working_df['time'] = working_df.timestamp.apply(datetime.fromtimestamp).astype(str)
+                # working_df['time'] = working_df.timestamp.apply(datetime.fromtimestamp).astype(str)
+                if self.with_comments:
+                    comments_df = pd.DataFrame()
+                    for pid, row in working_df.iterrows():
+                        reply_num = int(row['reply'])
+                        if reply_num > 0:
+                            comments_df = self.client.get_comments_data(pid, reply_num).combine_first(comments_df)
+                    self.db.update_comments_data(comments_df)
                 self.db.update_holes_data(working_df)
                 working_df = pd.DataFrame() 
             if (self.init_time - datetime.fromtimestamp(page_df.sort_values('timestamp').iloc[0]['timestamp'])).days == self.num_days:
                     break
             page += 1
-            time.sleep(self.page_interval+random.randint(-3,3))            
+            time.sleep(self.page_interval+random.randint(-1,1))            
         print(f"{str(datetime.now()).split('.')[0]}爬取完成！")
         self.db.get_statistics('holes')
+        self.db.get_statistics('comments')
 
     def monitor_key_word_init(self):
         self.key_words = config['Key_Words']['key_words']
@@ -122,10 +140,3 @@ class Crawler(object):
         if not df.empty:
             self.posted_df_pool = pd.concat([self.posted_df_pool, df])
         return df
-
-
-        
-
-
-            
-    

@@ -93,7 +93,23 @@ class TreeHoleClient(object):
         page_df['last_retrive'] = str(datetime.now()).split('.')[0]
         # covert Nonetype to string
         page_df.loc[:,'text'] = page_df.text.astype(str)
+        page_df['time'] = page_df.timestamp.apply(datetime.fromtimestamp).astype(str)
         return page_df
+
+    def get_comments_data(self, pid:str, reply_num:int):
+        get_dat = {
+            'limit': str(max(10, reply_num))
+        }
+        time.sleep(0.5)
+        resp_content = self._session.get(TreeHoleURLs.Api_comments+"/"+str(pid), params=get_dat, headers=self._headers)
+        comments_df = pd.json_normalize(resp_content.json()['data']['data'])
+        comments_df = comments_df.set_index('cid')
+        comments_df['last_retrive'] = str(datetime.now()).split('.')[0]
+        # covert Nonetype to string
+        comments_df.text = comments_df.text.astype(str)
+        comments_df.comment_id = comments_df.comment_id.astype(str)
+        comments_df['time'] = comments_df.timestamp.apply(datetime.fromtimestamp).astype(str)
+        return comments_df
         
 def print_time(func):
     def inner(*args, **kwargs):

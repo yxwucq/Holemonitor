@@ -65,9 +65,37 @@ class SQLDatabase(object):
             print(f"Last Update: {last_update_time}")
 
     def create_comments_table(self):
-        # TODO add page support
-        pass
+        with sqlite3.connect(self.database_name) as conn:
+            self.conn = sqlite3.connect(self.database_name)
+            self.c = self.conn.cursor()
+            self.c.execute(f'''CREATE TABLE IF NOT EXISTS comments
+                        (cid INTEGER PRIMARY KEY,
+                        pid INTEGER,
+                        text TEXT,
+                        name TEXT,
+                        time TEXT,
+                        comment_id TEXT,
+                        last_retrive TEXT)''')
+            self.conn.commit()
 
     def update_comments_data(self, data:pd.DataFrame):
-        # TODO add page data support
-        pass
+        with sqlite3.connect(self.database_name) as conn:
+            c = conn.cursor()
+            for index, row in data.iterrows():
+                try:
+                    cid = index
+                    pid = row['pid']
+                    text = row['text']
+                    name = row['name']
+                    time = str(row['time'])
+                    comment_id = row['comment_id']
+                    last_retrive = row['last_retrive']
+                    c.execute("SELECT * FROM comments WHERE cid=?", (cid,))
+                    result = c.fetchone()
+                except:
+                    print("Error!")
+                    print(index, row)
+                if not result:
+                    c.execute("INSERT INTO comments (cid, pid, text, name, time, comment_id, last_retrive) VALUES (?, ?, ?, ?, ?, ?, ?)", (cid, pid, text, name, time, comment_id, last_retrive))
+
+            conn.commit()
