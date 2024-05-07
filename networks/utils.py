@@ -81,6 +81,7 @@ class TreeHoleClient(object):
         resp_content = self._session.get(TreeHoleURLs.Api_content, params=get_dat, headers=self._headers)
         if resp_content.json()['success'] == False:
             print("================")
+            print(f"{str(datetime.now()).split('.')[0]}")
             print(f"爬取出现错误！{resp_content.json()['message']}")
             raise RuntimeError
         page_df = pd.json_normalize(resp_content.json()['data']['data'])

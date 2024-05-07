@@ -59,7 +59,10 @@ class Crawler(object):
                 for pid, row in working_df.iterrows():
                     reply_num = int(row['reply'])
                     if reply_num > 0:
-                        comments_df = self.client.get_comments_data(pid, reply_num).combine_first(comments_df)
+                        try:
+                            comments_df = self.client.get_comments_data(pid, reply_num).combine_first(comments_df)
+                        except:
+                            print(f"{pid} deleted!")
                 self.db.update_comments_data(comments_df)
             if self.monitor_key_words:
                 print(f"监控关键词 {self.key_words}")
