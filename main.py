@@ -9,7 +9,3 @@ if __name__ == '__main__':
             crawler.monitor_treehole()
         elif crawler.mode == 'day':
             crawler.craw_treehole()
-    
-
-
-

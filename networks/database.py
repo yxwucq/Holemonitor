@@ -1,4 +1,5 @@
 from .config import config
+import os
 import pandas as pd 
 import sqlite3
 
@@ -47,6 +48,16 @@ class SQLDatabase(object):
             df = pd.read_sql_query(f"SELECT * from {table_name}", conn)
             df.to_csv(filename, index=True)
     
+    def get_holes_data(self, pid:int):
+        with sqlite3.connect(self.database_name) as conn:
+            df = pd.read_sql_query(f"SELECT * from holes WHERE pid={pid}", conn)
+            return df
+        
+    def get_comments_data(self, pid:int):
+        with sqlite3.connect(self.database_name) as conn:
+            df = pd.read_sql_query(f"SELECT * from comments WHERE pid={pid}", conn)
+            return df
+        
     def get_statistics(self, table_name:str): # holes or pages
         with sqlite3.connect(self.database_name) as conn:
             c = conn.cursor()

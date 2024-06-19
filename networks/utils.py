@@ -72,30 +72,35 @@ class TreeHoleClient(object):
                 print("验证码错误！尝试重新输入")
 
     def get_tree_hole_data(self, page):
-        # print(f"reaching page {page}")
-        get_dat = {
-            'page': page,
-            'limit': 25
-        }
-        # self._update_user_agent()
-        resp_content = self._session.get(TreeHoleURLs.Api_content, params=get_dat, headers=self._headers)
-        if resp_content.json()['success'] == False:
-            print("================")
-            print(f"{str(datetime.now()).split('.')[0]}")
-            print(f"爬取出现错误！{resp_content.json()['message']}")
-            raise RuntimeError
-        page_df = pd.json_normalize(resp_content.json()['data']['data'])
-        # page_df.pid = page_df.pid.astype(str)
-        # droped_df = page_df.pid[~page_df.pid.str.match(r'^[0-9]+$', flags=re.DOTALL)]
-        # if len(droped_df) != 0:
-        #     print(f"dropping {droped_df.to_string()} since not pure numbers")
-        # page_df = page_df[page_df.pid.str.match(r'^[0-9]+$', flags=re.DOTALL)]
-        page_df = page_df.set_index('pid')
-        page_df['last_retrive'] = str(datetime.now()).split('.')[0]
-        # covert Nonetype to string
-        page_df.loc[:,'text'] = page_df.text.astype(str)
-        page_df['time'] = page_df.timestamp.apply(datetime.fromtimestamp).astype(str)
-        return page_df
+        for attempt in range(4):  # 尝试最多4次
+            get_dat = {
+                'page': page,
+                'limit': 25
+            }
+            resp_content = self._session.get(TreeHoleURLs.Api_content, params=get_dat, headers=self._headers)
+            if resp_content.status_code != 200 or resp_content.json().get('success') == False:
+                if attempt < 3:  # 如果不是最后一次尝试，则休息10秒
+                    print(f"Attempt {attempt + 1}: Response is empty or unsuccessful, retrying in 30 seconds...")
+                    time.sleep(10)
+                    continue
+                else:
+                    print("================")
+                    if resp_content.status_code != 200:
+                        print(f"请求失败，状态码：{resp_content.status_code}")
+                    else:
+                        print(f"请求失败，错误信息：{resp_content.json().get('message')}")
+                    print(f"{str(datetime.now()).split('.')[0]}")
+                    print("Failed to retrieve data after 4 attempts.")
+                    raise RuntimeError("Failed to retrieve data.")
+            # 如果成功获取到数据，处理数据
+            page_df = pd.json_normalize(resp_content.json()['data']['data'])
+            page_df = page_df.set_index('pid')
+            page_df['last_retrive'] = str(datetime.now()).split('.')[0]
+            page_df.loc[:, 'text'] = page_df.text.astype(str)
+            page_df['time'] = page_df.timestamp.apply(datetime.fromtimestamp).astype(str)
+            return page_df
+        # 如果循环结束还没有成功获取数据，则抛出异常
+        raise RuntimeError("Failed to retrieve data after 4 attempts.")
 
     def get_comments_data(self, pid:str, reply_num:int):
         get_dat = {
