@@ -3,6 +3,7 @@ import random
 import re
 import time
 from datetime import datetime
+from collections import OrderedDict
 
 import pandas as pd
 import requests
@@ -79,14 +80,15 @@ class TreeHoleClient(object):
             }
             resp_content = self._session.get(TreeHoleURLs.Api_content, params=get_dat, headers=self._headers)
             if resp_content.status_code != 200 or resp_content.json().get('success') == False:
-                if attempt < 3:  # 如果不是最后一次尝试，则休息10秒
+                if attempt < 3:  # 如果不是最后一次尝试，则休息
                     print(f"Attempt {attempt + 1}: Response is empty or unsuccessful, retrying in 30 seconds...")
-                    time.sleep(10)
+                    time.sleep(30*attempt)
                     continue
                 else:
                     print("================")
                     if resp_content.status_code != 200:
                         print(f"请求失败，状态码：{resp_content.status_code}")
+                        print(f"错误信息：{resp_content.text}")
                     else:
                         print(f"请求失败，错误信息：{resp_content.json().get('message')}")
                     print(f"{str(datetime.now()).split('.')[0]}")
@@ -116,7 +118,7 @@ class TreeHoleClient(object):
         comments_df.comment_id = comments_df.comment_id.astype(str)
         comments_df['time'] = comments_df.timestamp.apply(datetime.fromtimestamp).astype(str)
         return comments_df
-        
+   
 def print_time(func):
     def inner(*args, **kwargs):
         print("---------------------------")
@@ -125,3 +127,22 @@ def print_time(func):
         return func(*args, **kwargs)
     return inner
 
+class HotHoles:
+    def __init__(self):
+        # 初始化一个空的OrderedDict，用来存储pid和hotness
+        # 使用lambda x:x[1]来根据hotness排序
+        self.holes = OrderedDict()
+
+    def add_hole(self, pid, hotness):
+        # 如果新hole的hotness大于当前最小的hotness，则加入字典
+        if len(self.holes) < 5 or hotness > list(self.holes.items())[-1][1]:
+            self.holes[pid] = hotness
+            # 确保字典按hotness排序
+            self.holes = OrderedDict(sorted(self.holes.items(), key=lambda x: x[1], reverse=True))
+            # 如果字典长度超过5，移除热度最低的hole
+            if len(self.holes) > 5:
+                self.holes.popitem(last=True)
+
+    def get_holes(self):
+        # 返回当前的holes
+        return self.holes

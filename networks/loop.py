@@ -3,7 +3,7 @@ import random
 import re
 import time
 from datetime import datetime
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 import pandas as pd
 import requests
@@ -11,7 +11,7 @@ import requests
 from .config import config
 from .const import TreeHoleURLs
 from .database import SQLDatabase
-from .utils import TreeHoleClient, print_time
+from .utils import TreeHoleClient, HotHoles, print_time
 
 class Crawler(object):
     def __init__(self):
@@ -28,7 +28,15 @@ class Crawler(object):
         self.monitor_live_key_words = config['Monitor']['monitor_live_key_words'] == 'True'
         self.with_comments = config['Defaults']['comments'] == 'True'
         self.max_hole_actions = int(config['Monitor']['max_hole_actions'])
+        self.show_hot = config['Monitor']['show_hot'] == 'True'
+        self.show_hot_num = int(config['Monitor']['show_hot_num'])
+        self.show_hot_time = int(config['Monitor']['show_hot_time'])
+        
+        self.show_hot_task_executed = False
+        self.hot_pid_list = []
+        self.hotness_threshold = 0
         self.info_pid_set = set()
+        self.hot_holes = HotHoles()
         self.monitoring_dict = defaultdict(int) # comments count
         self.monitoring_dict_iter = defaultdict(int) # iteration count
         self.monitoring_df = pd.DataFrame()
@@ -73,6 +81,9 @@ class Crawler(object):
                     self.monitoring_df = self.monitoring_df.drop(pid)
                     del self.monitoring_dict[pid]
                     del self.monitoring_dict_iter[pid]
+                    if self.show_hot:
+                        hotness = int(row['reply']) * int(row['likenum'])
+                        self.hot_holes.add_hole(pid, hotness)
             else:
                 self.monitoring_dict_iter[pid] = 0
                 self.monitoring_dict[pid] = reply_num
@@ -101,6 +112,14 @@ class Crawler(object):
     def monitor_treehole(self):
         print(f"以监控模式运行")
         while True:
+            if self.show_hot:
+                current_time = datetime.now()
+                if current_time.hour == self.show_hot_time and not self.show_hot_task_executed:
+                    self.print_hot_holes(current_time)
+                    self.show_hot_task_executed = True
+                elif current_time.hour != self.show_hot_time:
+                    self.show_hot_task_executed = False
+                
             if self.morning_sleep and datetime.fromtimestamp(time.time()).hour == 3:
                 time.sleep(5*60*60) # sleep to 8am 
             for page in range(1, self.search_pages+1):
@@ -128,6 +147,10 @@ class Crawler(object):
                             print(f"{str(datetime.now()).split('.')[0]} {pid} deleted!")
                             print(f"{row.text}")
                             # read the deleted post from the database
+                            self.monitoring_df = self.monitoring_df.drop(pid)
+                            del self.monitoring_dict[pid]
+                            del self.monitoring_dict_iter[pid]
+                            
                             deleted_df = self.db.get_comments_data(pid)
                             if not deleted_df.empty:
                                 for cid, comment_row in deleted_df.iterrows():
@@ -203,3 +226,18 @@ class Crawler(object):
         if not df.empty:
             self.posted_df_pool = pd.concat([self.posted_df_pool, df])
         return df
+
+    def print_hot_holes(self, current_time):
+        print("====================================")
+        print(f"当前时间{current_time}，过去24小时热门帖子如下")
+        for pid, hotness in self.hot_holes.holes.items():
+            hole_df = self.db.get_holes_data(pid)
+            comment_df = self.db.get_comments_data(pid)
+            print(f"pid: {pid} hotness: {hotness}")
+            print(hole_df.text)
+            for cid, comment_row in comment_df.iterrows():
+                print(f"{cid}\t{comment_row['name']}\t{comment_row.text}")
+            print("====================================")
+
+        # reset hot_holes
+        self.hot_holes = HotHoles()
